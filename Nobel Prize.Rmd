@@ -1,0 +1,31 @@
+---
+title: "Nobel Prize"
+author: "Renee Watson"
+format:
+  html:
+    toc: true
+    df-print: paged
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Nobel Prize
+
+## Approach
+
+For this assignment, I plan to use the Nobel Prize organization's public APIs to explore patterns in Nobel Prize awards and laureates. I will retrieve the data in JSON format using R and the jsonlite package. Since the API data contains nested information, I will use purrr and dplyr from the tidyverse to organize the records into tidy data frames. I will create separate tables for prize records, laureate information, and individual laureate awards, then join the tables when needed for comparisons. I plan to investigate four questions: 
+  1. Which Nobel Prize category has awarded the most prizes?
+  2. Which decade had the highest number of individual Nobel laureate awards?
+  3. Which Nobel Prize category has the highest percentage of female laureates?
+  4. Which Nobel Prize category has the highest median age among recipients?
+  
+Some challenges I anticipate include working with nested JSON fields, accounting for laureates who have received more than one award, and distinguishing individual laureates from organizations. I will also need to check for missing birth dates when estimating recipient's ages. Because the age calculation uses birth year and award year, the ages will be approximate. For the decade comparison, I will note that the 2020s are not yet complete. I will use summary tables to present the findings and explain what each result means. 
+
+Data sources: Nobel Prize API, prize records
+
+              Nobel Prize API, laureate records
+              
+              Nobel Prize Developer Zone
+
