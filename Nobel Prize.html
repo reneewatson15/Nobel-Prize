@@ -27,6 +27,41 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
+/* CSS for syntax highlighting */
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
 </style>
 
 
@@ -58,6 +93,12 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#nobel-prize" id="toc-nobel-prize" class="nav-link active" data-scroll-target="#nobel-prize">Nobel Prize</a>
   <ul class="collapse">
   <li><a href="#approach" id="toc-approach" class="nav-link" data-scroll-target="#approach">Approach</a></li>
+  <li><a href="#codebase" id="toc-codebase" class="nav-link" data-scroll-target="#codebase">Codebase</a></li>
+  <li><a href="#question-1-which-nobel-prize-category-has-awarded-the-most-prizes" id="toc-question-1-which-nobel-prize-category-has-awarded-the-most-prizes" class="nav-link" data-scroll-target="#question-1-which-nobel-prize-category-has-awarded-the-most-prizes">Question 1: Which Nobel Prize category has awarded the most prizes?</a></li>
+  <li><a href="#question-2-which-decade-had-the-highest-number-of-individual-nobel-laureate-awards" id="toc-question-2-which-decade-had-the-highest-number-of-individual-nobel-laureate-awards" class="nav-link" data-scroll-target="#question-2-which-decade-had-the-highest-number-of-individual-nobel-laureate-awards">Question 2: Which decade had the highest number of individual Nobel laureate awards?</a></li>
+  <li><a href="#question-3-which-nobel-prize-category-has-the-highest-percentage-of-female-laureates" id="toc-question-3-which-nobel-prize-category-has-the-highest-percentage-of-female-laureates" class="nav-link" data-scroll-target="#question-3-which-nobel-prize-category-has-the-highest-percentage-of-female-laureates">Question 3: Which Nobel Prize category has the highest percentage of female laureates?</a></li>
+  <li><a href="#question-4-which-nobel-prize-category-has-the-highest-median-age-among-recipients" id="toc-question-4-which-nobel-prize-category-has-the-highest-median-age-among-recipients" class="nav-link" data-scroll-target="#question-4-which-nobel-prize-category-has-the-highest-median-age-among-recipients">Question 4: Which Nobel Prize category has the highest median age among recipients?</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion">Conclusion</a></li>
   </ul></li>
   </ul>
 </nav>
@@ -99,6 +140,412 @@ ul.task-list li input[type="checkbox"] {
 <pre><code>          Nobel Prize API, laureate records
           
           Nobel Prize Developer Zone</code></pre>
+<p>Reference: Nobel Prize Outreach. (n.d.). Nobel Prize Developer Zone (API version 2.1). https://www.nobelprize.org/about/developer-zone-2/</p>
+</section>
+<section id="codebase" class="level2">
+<h2 class="anchored" data-anchor-id="codebase">Codebase</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(tidyverse)</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(jsonlite)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(knitr)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+<p>The API returns data in pages. The function below retrieves every page, so the analysis is not limited to the first 25 or 1,000 records. <code>simplifyVector = FALSE</code> preserves the nested JSON structure while the data are being read.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>base_url <span class="ot">&lt;-</span> <span class="st">"https://api.nobelprize.org/2.1"</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>get_all_records <span class="ot">&lt;-</span> <span class="cf">function</span>(endpoint, field, <span class="at">page_size =</span> <span class="dv">1000</span>) {</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  all_records <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  offset <span class="ot">&lt;-</span> <span class="dv">0</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">repeat</span> {</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    url <span class="ot">&lt;-</span> <span class="fu">paste0</span>(</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>      base_url, <span class="st">"/"</span>, endpoint,</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>      <span class="st">"?limit="</span>, page_size, <span class="st">"&amp;offset="</span>, offset</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>    response <span class="ot">&lt;-</span> jsonlite<span class="sc">::</span><span class="fu">fromJSON</span>(url, <span class="at">simplifyVector =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>    page <span class="ot">&lt;-</span> response[[field]]</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">is.null</span>(page) <span class="sc">||</span> <span class="fu">length</span>(page) <span class="sc">==</span> <span class="dv">0</span>) <span class="cf">break</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>    all_records <span class="ot">&lt;-</span> <span class="fu">c</span>(all_records, page)</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> (<span class="fu">length</span>(page) <span class="sc">&lt;</span> page_size) <span class="cf">break</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    offset <span class="ot">&lt;-</span> offset <span class="sc">+</span> page_size</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>  all_records</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>prizes_json <span class="ot">&lt;-</span> <span class="fu">get_all_records</span>(<span class="st">"nobelPrizes"</span>, <span class="st">"nobelPrizes"</span>)</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>laureates_json <span class="ot">&lt;-</span> <span class="fu">get_all_records</span>(<span class="st">"laureates"</span>, <span class="st">"laureates"</span>)</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Prize records retrieved:"</span>, <span class="fu">length</span>(prizes_json), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Prize records retrieved: 688 </code></pre>
+</div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Laureate records retrieved:"</span>, <span class="fu">length</span>(laureates_json), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Laureate records retrieved: 1028 </code></pre>
+</div>
+</div>
+<p>Some JSON properties are missing for certain records, particularly for organizations. This helper converts a missing value into <code>NA</code>.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>get_text <span class="ot">&lt;-</span> <span class="cf">function</span>(x) {</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(x) <span class="sc">||</span> <span class="fu">length</span>(x) <span class="sc">==</span> <span class="dv">0</span>) {</span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>    <span class="cn">NA_character_</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  } <span class="cf">else</span> {</span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as.character</span>(x[[<span class="dv">1</span>]])</span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a>prizes <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(prizes_json, <span class="cf">function</span>(x) {</span>
+<span id="cb7-11"><a href="#cb7-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(</span>
+<span id="cb7-12"><a href="#cb7-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">award_year =</span> <span class="fu">as.integer</span>(x<span class="sc">$</span>awardYear),</span>
+<span id="cb7-13"><a href="#cb7-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">category =</span> <span class="fu">get_text</span>(x<span class="sc">$</span>category<span class="sc">$</span>en),</span>
+<span id="cb7-14"><a href="#cb7-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">recipients =</span> <span class="fu">length</span>(x<span class="sc">$</span>laureates)</span>
+<span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb7-17"><a href="#cb7-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-18"><a href="#cb7-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-19"><a href="#cb7-19" aria-hidden="true" tabindex="-1"></a>laureates <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(laureates_json, <span class="cf">function</span>(x) {</span>
+<span id="cb7-20"><a href="#cb7-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tibble</span>(</span>
+<span id="cb7-21"><a href="#cb7-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">laureate_id =</span> <span class="fu">as.character</span>(x<span class="sc">$</span>id),</span>
+<span id="cb7-22"><a href="#cb7-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">name =</span> <span class="fu">coalesce</span>(</span>
+<span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>      <span class="fu">get_text</span>(x<span class="sc">$</span>knownName<span class="sc">$</span>en),</span>
+<span id="cb7-24"><a href="#cb7-24" aria-hidden="true" tabindex="-1"></a>      <span class="fu">get_text</span>(x<span class="sc">$</span>orgName<span class="sc">$</span>en),</span>
+<span id="cb7-25"><a href="#cb7-25" aria-hidden="true" tabindex="-1"></a>      <span class="fu">get_text</span>(x<span class="sc">$</span>fullName<span class="sc">$</span>en)</span>
+<span id="cb7-26"><a href="#cb7-26" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb7-27"><a href="#cb7-27" aria-hidden="true" tabindex="-1"></a>    <span class="at">gender =</span> <span class="fu">get_text</span>(x<span class="sc">$</span>gender),</span>
+<span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">birth_date =</span> <span class="fu">get_text</span>(x<span class="sc">$</span>birth<span class="sc">$</span>date)</span>
+<span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb7-30"><a href="#cb7-30" aria-hidden="true" tabindex="-1"></a>})</span>
+<span id="cb7-31"><a href="#cb7-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-32"><a href="#cb7-32" aria-hidden="true" tabindex="-1"></a>laureate_awards <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map_dfr</span>(laureates_json, <span class="cf">function</span>(x) {</span>
+<span id="cb7-33"><a href="#cb7-33" aria-hidden="true" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">map_dfr</span>(x<span class="sc">$</span>nobelPrizes, <span class="cf">function</span>(p) {</span>
+<span id="cb7-34"><a href="#cb7-34" aria-hidden="true" tabindex="-1"></a>    <span class="fu">tibble</span>(</span>
+<span id="cb7-35"><a href="#cb7-35" aria-hidden="true" tabindex="-1"></a>      <span class="at">laureate_id =</span> <span class="fu">as.character</span>(x<span class="sc">$</span>id),</span>
+<span id="cb7-36"><a href="#cb7-36" aria-hidden="true" tabindex="-1"></a>      <span class="at">award_year =</span> <span class="fu">as.integer</span>(p<span class="sc">$</span>awardYear),</span>
+<span id="cb7-37"><a href="#cb7-37" aria-hidden="true" tabindex="-1"></a>      <span class="at">category =</span> <span class="fu">get_text</span>(p<span class="sc">$</span>category<span class="sc">$</span>en)</span>
+<span id="cb7-38"><a href="#cb7-38" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb7-39"><a href="#cb7-39" aria-hidden="true" tabindex="-1"></a>  })</span>
+<span id="cb7-40"><a href="#cb7-40" aria-hidden="true" tabindex="-1"></a>}) <span class="sc">%&gt;%</span></span>
+<span id="cb7-41"><a href="#cb7-41" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>(laureate_id, award_year, category)</span>
+<span id="cb7-42"><a href="#cb7-42" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-43"><a href="#cb7-43" aria-hidden="true" tabindex="-1"></a>individual_awards <span class="ot">&lt;-</span> laureate_awards <span class="sc">%&gt;%</span></span>
+<span id="cb7-44"><a href="#cb7-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(laureates, <span class="at">by =</span> <span class="st">"laureate_id"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb7-45"><a href="#cb7-45" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(gender <span class="sc">%in%</span> <span class="fu">c</span>(<span class="st">"male"</span>, <span class="st">"female"</span>))</span>
+<span id="cb7-46"><a href="#cb7-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-47"><a href="#cb7-47" aria-hidden="true" tabindex="-1"></a><span class="fu">cat</span>(<span class="st">"Individual laureate-award records:"</span>, <span class="fu">nrow</span>(individual_awards), <span class="st">"</span><span class="sc">\n</span><span class="st">"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Individual laureate-award records: 1005 </code></pre>
+</div>
+</div>
+</section>
+<section id="question-1-which-nobel-prize-category-has-awarded-the-most-prizes" class="level2">
+<h2 class="anchored" data-anchor-id="question-1-which-nobel-prize-category-has-awarded-the-most-prizes">Question 1: Which Nobel Prize category has awarded the most prizes?</h2>
+<p>This question compares the number of awarded prizes in each category. I use the <code>nobelPrizes</code> data and exclude records for years when no prize recipient was named.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>category_counts <span class="ot">&lt;-</span> prizes <span class="sc">%&gt;%</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(recipients <span class="sc">&gt;</span> <span class="dv">0</span>, <span class="sc">!</span><span class="fu">is.na</span>(category)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(category, <span class="at">name =</span> <span class="st">"prizes_awarded"</span>, <span class="at">sort =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  category_counts,</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="at">col.names =</span> <span class="fu">c</span>(<span class="st">"Nobel Prize category"</span>, <span class="st">"Prizes awarded"</span>),</span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="at">caption =</span> <span class="st">"Number of awarded prizes by category"</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Number of awarded prizes by category</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Nobel Prize category</th>
+<th style="text-align: right;">Prizes awarded</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Physics</td>
+<td style="text-align: right;">120</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Literature</td>
+<td style="text-align: right;">119</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Chemistry</td>
+<td style="text-align: right;">118</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Physiology or Medicine</td>
+<td style="text-align: right;">117</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Peace</td>
+<td style="text-align: right;">107</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Economic Sciences</td>
+<td style="text-align: right;">58</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>The results show that Physics has the highest number of Nobel Prizes awarded, with 120 prizes, followed by Literature with 119 and Chemistry with 118. Physiology or Medicine has 117 prizes, while Peace has 107. Economic Sciences has the fewest, with 58 prizes.</p>
+</section>
+<section id="question-2-which-decade-had-the-highest-number-of-individual-nobel-laureate-awards" class="level2">
+<h2 class="anchored" data-anchor-id="question-2-which-decade-had-the-highest-number-of-individual-nobel-laureate-awards">Question 2: Which decade had the highest number of individual Nobel laureate awards?</h2>
+<p>For this question, I use the laureate-award data and group the award years into decades. I count each individual award once, including laureates who may have received more than one prize. Organizations are excluded from this comparison.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>decade_counts <span class="ot">&lt;-</span> individual_awards <span class="sc">%&gt;%</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(award_year)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">decade =</span> (award_year <span class="sc">%/%</span> <span class="dv">10</span>) <span class="sc">*</span> <span class="dv">10</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(decade, <span class="at">name =</span> <span class="st">"individual_awards"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(individual_awards)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">decade =</span> <span class="fu">paste0</span>(decade, <span class="st">"s"</span>))</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(</span>
+<span id="cb10-9"><a href="#cb10-9" aria-hidden="true" tabindex="-1"></a>  decade_counts,</span>
+<span id="cb10-10"><a href="#cb10-10" aria-hidden="true" tabindex="-1"></a>  <span class="at">col.names =</span> <span class="fu">c</span>(<span class="st">"Decade"</span>, <span class="st">"Individual laureate awards"</span>),</span>
+<span id="cb10-11"><a href="#cb10-11" aria-hidden="true" tabindex="-1"></a>  <span class="at">caption =</span> <span class="st">"Individual Nobel laureate awards by decade"</span></span>
+<span id="cb10-12"><a href="#cb10-12" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Individual Nobel laureate awards by decade</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Decade</th>
+<th style="text-align: right;">Individual laureate awards</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">2000s</td>
+<td style="text-align: right;">119</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">2010s</td>
+<td style="text-align: right;">117</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">1970s</td>
+<td style="text-align: right;">103</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">1990s</td>
+<td style="text-align: right;">101</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">1980s</td>
+<td style="text-align: right;">94</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">2020s</td>
+<td style="text-align: right;">82</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">1960s</td>
+<td style="text-align: right;">75</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">1950s</td>
+<td style="text-align: right;">71</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">1900s</td>
+<td style="text-align: right;">56</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">1930s</td>
+<td style="text-align: right;">55</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">1920s</td>
+<td style="text-align: right;">54</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">1940s</td>
+<td style="text-align: right;">40</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">1910s</td>
+<td style="text-align: right;">38</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>The results show that the 2000s had the highest number of individual Nobel laureate awards, with 119, followed by the 2010s with 117. The 1970s ranked third with 103 awards. The 1910s had the fewest, with 38 awards.</p>
+</section>
+<section id="question-3-which-nobel-prize-category-has-the-highest-percentage-of-female-laureates" class="level2">
+<h2 class="anchored" data-anchor-id="question-3-which-nobel-prize-category-has-the-highest-percentage-of-female-laureates">Question 3: Which Nobel Prize category has the highest percentage of female laureates?</h2>
+<p>I compare gender and prize category using the individual laureate records. I count each person only once per category, even if that person received more than one prize in that category. Organizations are excluded because they are not individual men or women.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>gender_by_category <span class="ot">&lt;-</span> individual_awards <span class="sc">%&gt;%</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>(laureate_id, category, gender) <span class="sc">%&gt;%</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(category) <span class="sc">%&gt;%</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">women =</span> <span class="fu">sum</span>(gender <span class="sc">==</span> <span class="st">"female"</span>),</span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">total_individuals =</span> <span class="fu">n</span>(),</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">female_percent =</span> <span class="fu">round</span>(<span class="dv">100</span> <span class="sc">*</span> women <span class="sc">/</span> total_individuals, <span class="dv">1</span>),</span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(female_percent))</span>
+<span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(</span>
+<span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>  gender_by_category,</span>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>  <span class="at">col.names =</span> <span class="fu">c</span>(<span class="st">"Category"</span>, <span class="st">"Female laureates"</span>, <span class="st">"All individual laureates"</span>, <span class="st">"Female (%)"</span>),</span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>  <span class="at">caption =</span> <span class="st">"Percentage of female Nobel laureates by category"</span></span>
+<span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Percentage of female Nobel laureates by category</caption>
+<colgroup>
+<col style="width: 30%">
+<col style="width: 22%">
+<col style="width: 32%">
+<col style="width: 14%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Category</th>
+<th style="text-align: right;">Female laureates</th>
+<th style="text-align: right;">All individual laureates</th>
+<th style="text-align: right;">Female (%)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Peace</td>
+<td style="text-align: right;">21</td>
+<td style="text-align: right;">113</td>
+<td style="text-align: right;">18.6</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Literature</td>
+<td style="text-align: right;">19</td>
+<td style="text-align: right;">123</td>
+<td style="text-align: right;">15.4</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Physiology or Medicine</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">235</td>
+<td style="text-align: right;">6.0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Chemistry</td>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">200</td>
+<td style="text-align: right;">4.0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Economic Sciences</td>
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">101</td>
+<td style="text-align: right;">3.0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Physics</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">230</td>
+<td style="text-align: right;">2.2</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>The results show that Peace has the highest percentage of female Nobel laureates, with 18.6% (21 out of 113), followed by Literature at 15.4% (19 out of 123). Physiology or Medicine has 6.0%, Chemistry has 4.0%, and Economic Sciences has 3.0%. Physics has the lowest percentage of female laureates at 2.2% (5 out of 230).</p>
+</section>
+<section id="question-4-which-nobel-prize-category-has-the-highest-median-age-among-recipients" class="level2">
+<h2 class="anchored" data-anchor-id="question-4-which-nobel-prize-category-has-the-highest-median-age-among-recipients">Question 4: Which Nobel Prize category has the highest median age among recipients?</h2>
+<p>This question requires combining information from different fields. I join each person’s birth date to their Nobel Prize award year using <code>laureate_id</code>. I then subtract the birth year from the award year and compare the median estimated age across categories. The ages are estimates based on birth year and award year rather than exact dates, and recipients with missing birth information are excluded from the analysis.</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>ages_at_award <span class="ot">&lt;-</span> individual_awards <span class="sc">%&gt;%</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">birth_year =</span> <span class="fu">as.integer</span>(<span class="fu">substr</span>(birth_date, <span class="dv">1</span>, <span class="dv">4</span>)),</span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">estimated_age =</span> award_year <span class="sc">-</span> birth_year</span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(</span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    <span class="sc">!</span><span class="fu">is.na</span>(estimated_age),</span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a>    <span class="fu">between</span>(estimated_age, <span class="dv">0</span>, <span class="dv">120</span>)</span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>age_by_category <span class="ot">&lt;-</span> ages_at_award <span class="sc">%&gt;%</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(category) <span class="sc">%&gt;%</span></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">laureate_awards =</span> <span class="fu">n</span>(),</span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">median_age =</span> <span class="fu">round</span>(<span class="fu">median</span>(estimated_age), <span class="dv">1</span>),</span>
+<span id="cb12-16"><a href="#cb12-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">mean_age =</span> <span class="fu">round</span>(<span class="fu">mean</span>(estimated_age), <span class="dv">1</span>),</span>
+<span id="cb12-17"><a href="#cb12-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">"drop"</span></span>
+<span id="cb12-18"><a href="#cb12-18" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb12-19"><a href="#cb12-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(median_age))</span>
+<span id="cb12-20"><a href="#cb12-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-21"><a href="#cb12-21" aria-hidden="true" tabindex="-1"></a>knitr<span class="sc">::</span><span class="fu">kable</span>(</span>
+<span id="cb12-22"><a href="#cb12-22" aria-hidden="true" tabindex="-1"></a>  age_by_category,</span>
+<span id="cb12-23"><a href="#cb12-23" aria-hidden="true" tabindex="-1"></a>  <span class="at">col.names =</span> <span class="fu">c</span>(<span class="st">"Category"</span>, <span class="st">"Awards with birth year"</span>, <span class="st">"Median age"</span>, <span class="st">"Mean age"</span>),</span>
+<span id="cb12-24"><a href="#cb12-24" aria-hidden="true" tabindex="-1"></a>  <span class="at">caption =</span> <span class="st">"Estimated age at Nobel Prize award by category"</span></span>
+<span id="cb12-25"><a href="#cb12-25" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<caption>Estimated age at Nobel Prize award by category</caption>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Category</th>
+<th style="text-align: right;">Awards with birth year</th>
+<th style="text-align: right;">Median age</th>
+<th style="text-align: right;">Mean age</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Economic Sciences</td>
+<td style="text-align: right;">101</td>
+<td style="text-align: right;">67</td>
+<td style="text-align: right;">67.2</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Literature</td>
+<td style="text-align: right;">123</td>
+<td style="text-align: right;">67</td>
+<td style="text-align: right;">65.0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Peace</td>
+<td style="text-align: right;">113</td>
+<td style="text-align: right;">62</td>
+<td style="text-align: right;">61.0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Chemistry</td>
+<td style="text-align: right;">202</td>
+<td style="text-align: right;">58</td>
+<td style="text-align: right;">59.5</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Physiology or Medicine</td>
+<td style="text-align: right;">235</td>
+<td style="text-align: right;">58</td>
+<td style="text-align: right;">59.0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Physics</td>
+<td style="text-align: right;">231</td>
+<td style="text-align: right;">56</td>
+<td style="text-align: right;">57.8</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>The results show that Economic Sciences and Literature have the highest median age at the time of the award, both at approximately 67 years. Peace follows with a median age of 62 years, while Chemistry and Physiology or Medicine both have a median age of 58 years. Physics has the lowest median age at 56 years.</p>
+</section>
+<section id="conclusion" class="level2">
+<h2 class="anchored" data-anchor-id="conclusion">Conclusion</h2>
+<p>This analysis used JSON data from the Nobel Prize APIs to examine patterns in Nobel Prize awards and recipients. The results showed that Physics had the most prizes awarded, while the 2000s had the highest number of individual laureate awards. Peace had the highest percentage of female laureates. Economic Sciences and Literature had the highest median age among recipients. Overall, the findings demonstrate how JSON data can be transformed and analyzed in R to explore historical patterns and differences across Nobel Prize categories.</p>
 </section>
 </section>
 

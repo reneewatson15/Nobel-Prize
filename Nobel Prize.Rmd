@@ -29,3 +29,206 @@ Data sources: Nobel Prize API, prize records
               
               Nobel Prize Developer Zone
 
+Reference: Nobel Prize Outreach. (n.d.). Nobel Prize Developer Zone (API version 2.1). https://www.nobelprize.org/about/developer-zone-2/
+
+## Codebase
+
+```{r}
+library(tidyverse)
+library(jsonlite)
+library(knitr)
+```
+
+The API returns data in pages. The function below retrieves every page, so the analysis is not limited to the first 25 or 1,000 records. `simplifyVector = FALSE` preserves the nested JSON structure while the data are being read.
+
+```{r}
+base_url <- "https://api.nobelprize.org/2.1"
+
+get_all_records <- function(endpoint, field, page_size = 1000) {
+  all_records <- list()
+  offset <- 0
+
+  repeat {
+    url <- paste0(
+      base_url, "/", endpoint,
+      "?limit=", page_size, "&offset=", offset
+    )
+
+    response <- jsonlite::fromJSON(url, simplifyVector = FALSE)
+    page <- response[[field]]
+
+    if (is.null(page) || length(page) == 0) break
+
+    all_records <- c(all_records, page)
+
+    if (length(page) < page_size) break
+    offset <- offset + page_size
+  }
+
+  all_records
+}
+
+prizes_json <- get_all_records("nobelPrizes", "nobelPrizes")
+laureates_json <- get_all_records("laureates", "laureates")
+
+cat("Prize records retrieved:", length(prizes_json), "\n")
+cat("Laureate records retrieved:", length(laureates_json), "\n")
+```
+
+Some JSON properties are missing for certain records, particularly for organizations. This helper converts a missing value into `NA`.
+
+```{r}
+get_text <- function(x) {
+  if (is.null(x) || length(x) == 0) {
+    NA_character_
+  } else {
+    as.character(x[[1]])
+  }
+}
+
+
+prizes <- purrr::map_dfr(prizes_json, function(x) {
+  tibble(
+    award_year = as.integer(x$awardYear),
+    category = get_text(x$category$en),
+    recipients = length(x$laureates)
+  )
+})
+
+
+laureates <- purrr::map_dfr(laureates_json, function(x) {
+  tibble(
+    laureate_id = as.character(x$id),
+    name = coalesce(
+      get_text(x$knownName$en),
+      get_text(x$orgName$en),
+      get_text(x$fullName$en)
+    ),
+    gender = get_text(x$gender),
+    birth_date = get_text(x$birth$date)
+  )
+})
+
+laureate_awards <- purrr::map_dfr(laureates_json, function(x) {
+  purrr::map_dfr(x$nobelPrizes, function(p) {
+    tibble(
+      laureate_id = as.character(x$id),
+      award_year = as.integer(p$awardYear),
+      category = get_text(p$category$en)
+    )
+  })
+}) %>%
+  distinct(laureate_id, award_year, category)
+
+individual_awards <- laureate_awards %>%
+  left_join(laureates, by = "laureate_id") %>%
+  filter(gender %in% c("male", "female"))
+
+cat("Individual laureate-award records:", nrow(individual_awards), "\n")
+```
+
+## Question 1: Which Nobel Prize category has awarded the most prizes?
+
+This question compares the number of awarded prizes in each category. I use the `nobelPrizes` data and exclude records for years when no prize recipient was named.
+
+```{r}
+category_counts <- prizes %>%
+  filter(recipients > 0, !is.na(category)) %>%
+  count(category, name = "prizes_awarded", sort = TRUE)
+
+knitr::kable(
+  category_counts,
+  col.names = c("Nobel Prize category", "Prizes awarded"),
+  caption = "Number of awarded prizes by category"
+)
+```
+
+The results show that Physics has the highest number of Nobel Prizes awarded, with 120 prizes, followed by Literature with 119 and Chemistry with 118. Physiology or Medicine has 117 prizes, while Peace has 107. Economic Sciences has the fewest, with 58 prizes. 
+
+
+## Question 2: Which decade had the highest number of individual Nobel laureate awards?
+
+For this question, I use the laureate-award data and group the award years into decades. I count each individual award once, including laureates who may have received more than one prize. Organizations are excluded from this comparison.
+
+```{r}
+decade_counts <- individual_awards %>%
+  filter(!is.na(award_year)) %>%
+  mutate(decade = (award_year %/% 10) * 10) %>%
+  count(decade, name = "individual_awards") %>%
+  arrange(desc(individual_awards)) %>%
+  mutate(decade = paste0(decade, "s"))
+
+knitr::kable(
+  decade_counts,
+  col.names = c("Decade", "Individual laureate awards"),
+  caption = "Individual Nobel laureate awards by decade"
+)
+```
+
+The results show that the 2000s had the highest number of individual Nobel laureate awards, with 119, followed by the 2010s with 117. The 1970s ranked third with 103 awards. The 1910s had the fewest, with 38 awards. 
+
+## Question 3: Which Nobel Prize category has the highest percentage of female laureates?
+
+I compare gender and prize category using the individual laureate records. I count each person only once per category, even if that person received more than one prize in that category. Organizations are excluded because they are not individual men or women.
+
+```{r}
+gender_by_category <- individual_awards %>%
+  distinct(laureate_id, category, gender) %>%
+  group_by(category) %>%
+  summarise(
+    women = sum(gender == "female"),
+    total_individuals = n(),
+    female_percent = round(100 * women / total_individuals, 1),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(female_percent))
+
+knitr::kable(
+  gender_by_category,
+  col.names = c("Category", "Female laureates", "All individual laureates", "Female (%)"),
+  caption = "Percentage of female Nobel laureates by category"
+)
+```
+
+The results show that Peace has the highest percentage of female Nobel laureates, with 18.6% (21 out of 113), followed by Literature at 15.4% (19 out of 123). Physiology or Medicine has 6.0%, Chemistry has 4.0%, and Economic Sciences has 3.0%. Physics has the lowest percentage of female laureates at 2.2% (5 out of 230).
+
+## Question 4: Which Nobel Prize category has the highest median age among recipients?
+
+This question requires combining information from different fields. I join each person's birth date to their Nobel Prize award year using `laureate_id`. I then subtract the birth year from the award year and compare the median estimated age across categories. The ages are estimates based on birth year and award year rather than exact dates, and recipients with missing birth information are excluded from the analysis. 
+
+```{r}
+ages_at_award <- individual_awards %>%
+  mutate(
+    birth_year = as.integer(substr(birth_date, 1, 4)),
+    estimated_age = award_year - birth_year
+  ) %>%
+  filter(
+    !is.na(estimated_age),
+    between(estimated_age, 0, 120)
+  )
+
+age_by_category <- ages_at_award %>%
+  group_by(category) %>%
+  summarise(
+    laureate_awards = n(),
+    median_age = round(median(estimated_age), 1),
+    mean_age = round(mean(estimated_age), 1),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(median_age))
+
+knitr::kable(
+  age_by_category,
+  col.names = c("Category", "Awards with birth year", "Median age", "Mean age"),
+  caption = "Estimated age at Nobel Prize award by category"
+)
+```
+
+The results show that Economic Sciences and Literature have the highest median age at the time of the award, both at approximately 67 years. Peace follows with a median age of 62 years, while Chemistry and Physiology or Medicine both have a median age of 58 years. Physics has the lowest median age at 56 years.
+
+## Conclusion
+
+This analysis used JSON data from the Nobel Prize APIs to examine patterns in Nobel Prize awards and recipients. The results showed that Physics had the most prizes awarded, while the 2000s had the highest number of individual laureate awards. Peace had the highest percentage of female laureates. Economic Sciences and Literature had the highest median age among recipients. Overall, the findings demonstrate how JSON data can be transformed and analyzed in R to explore historical patterns and differences across Nobel Prize categories.
+
+
+
